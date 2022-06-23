@@ -1,86 +1,75 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using SocketApp;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 
-Console.WriteLine("Hello, World!");
+Console.WriteLine("___Socket App___");
 
-//try
-//{
-//    var listen = new TcpListener(IPAddress.Parse("88.212.241.115"), 2013);
-//    listen.Start();
-//    Byte[] bytes;
-//    while (true)
-//    {
-//        TcpClient client = listen.AcceptTcpClient();
-//        NetworkStream ns = client.GetStream();
-//        if (client.ReceiveBufferSize > 0)
-//        {
-//            bytes = new byte[client.ReceiveBufferSize];
-//            ns.Read(bytes, 0, client.ReceiveBufferSize);
-//            string msg = Encoding.UTF8.GetString(bytes); //the message incoming
-//            Console.Write(msg);
-//        }
-//    }
-//}
-//catch (Exception e)
-//{
-//    Console.WriteLine(e.Message);
-//}
+static int? GetNumber(int inputNumber)
+{
+    var tcpEndpoint = SocketHelper.GetEndpoint();
+    var tcpSocket = SocketHelper.GetSocket();
 
-
-
-
-
-
-
-
-
-
-var tcpEndpoint = new IPEndPoint(IPAddress.Parse("88.212.241.115"), 2013);
-
-var tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-var message = "111\n";
-var data = Encoding.UTF8.GetBytes(message);
-//try
-//{
-    tcpSocket.Connect(tcpEndpoint);
-    tcpSocket.Send(data);
-
+    var message = $"{inputNumber}\n";
+    var data = Encoding.UTF8.GetBytes(message);
     var buffer = new byte[256];
-    var size = 0;
     var answer = new StringBuilder();
-
+    
     string str;
 
-    var rxNumberTail = new Regex(@"\d[^\d]",
-              RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    var rxFullNumber = new Regex(@"\d+",
-              RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
     var isNumberReceived = false;
-    do
-    {
-        size = tcpSocket.Receive(buffer);
-        str = Encoding.UTF8.GetString(buffer, 0, size);
-        Console.Write(str);
 
-        answer.Append(str);
-        var matches = rxNumberTail.Matches(answer.ToString());
-        if (matches.Count > 0) isNumberReceived = true;
-    } while (!isNumberReceived);
-//} catch(Exception e)
-//{
-//    Console.WriteLine(e.Message);
-//}
-Console.WriteLine("Answer: " + answer.ToString());
-var source = Regex.Replace(answer.ToString(), @"[^0-9]", "");
-Console.WriteLine("Source: " + source);
-MatchCollection matches1 = rxFullNumber.Matches(answer.ToString());
-Console.WriteLine("Cropped: " + matches1[0].Value.ToString());
-tcpSocket.Shutdown(SocketShutdown.Both);
-tcpSocket.Close();
-Console.WriteLine("Socket closed");
+    try
+    {
+        tcpSocket.Connect(tcpEndpoint);
+        tcpSocket.Send(data);
+
+        do
+        {
+            var size = tcpSocket.Receive(buffer);
+            str = Encoding.UTF8.GetString(buffer, 0, size);
+            Console.Write(str);
+
+            answer.Append(str);
+            if (SocketHelper.CheckReceiveTerminationRequired(str, answer.ToString())) isNumberReceived = true;
+        } while (!isNumberReceived && tcpSocket.Connected);
+    }
+    catch (Exception e)
+    {
+        Console.WriteLine(e.Message);
+    }
+
+    if (tcpSocket.Connected)
+    {
+        tcpSocket.Shutdown(SocketShutdown.Both);
+        tcpSocket.Close();
+        Console.WriteLine("Socket closed");
+    }
+
+    if (!isNumberReceived) return null;
+
+    var strNumber = Regex.Replace(answer.ToString(), @"[^0-9]", "");
+    return Int32.TryParse(strNumber, out int resultNumber) ? resultNumber : null;
+}
+
+int? number = null;
+
+while (number is null)
+{
+    number = GetNumber(111);
+    if (number is null)
+    {
+        // Restart socket
+        Console.WriteLine("Number is not received. Wait 5sec to retry...");
+        Thread.Sleep(5000);
+    }
+    else
+    {
+        Console.WriteLine(number);
+    }
+}
+
+Console.WriteLine("Press any key to quit");
 Console.ReadLine();
