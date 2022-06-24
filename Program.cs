@@ -40,30 +40,35 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
             {
                 await client.ConnectAsync("88.212.241.115", 2013);
 
-
-                var tcpStream = client.GetStream();
-                var sendBytes = Encoding.UTF8.GetBytes($"{inputNumber}\n");
-                await tcpStream.WriteAsync(sendBytes, 0, sendBytes.Length);
-
-                using (var reader = new StreamReader(tcpStream))
+                if (client.Connected)
                 {
-                    var message = await reader.ReadToEndAsync();
-                    var isCompleteMessage = rxLF.Matches(message).Count > 0;
+                    var tcpStream = client.GetStream();
+                    var sendBytes = Encoding.UTF8.GetBytes($"{inputNumber}\n");
+                    await tcpStream.WriteAsync(sendBytes, 0, sendBytes.Length);
 
-                    if (!isCompleteMessage)
+                    using (var reader = new StreamReader(tcpStream))
                     {
-                        Console.WriteLine("MessageBroken");
-                    }
+                        var message = await reader.ReadToEndAsync();
+                        //Console.WriteLine(message);
+                        //var isCompleteMessage = rxLF.Matches(message).Count > 0;
+                        var isCompleteMessage = true;
+                        if (!isCompleteMessage)
+                        {
+                            Console.WriteLine("MessageBroken");
+                        }
 
-                    if (isCompleteMessage)
-                    {
-                        var strNumber = rxCropNumber.Replace(message, "");
-                        receivedNumber = int.TryParse(strNumber, out int parsedNumber) ? parsedNumber : null;
-                    }
+                        if (isCompleteMessage)
+                        {
+                            
+                            var strNumber = rxCropNumber.Replace(message, "");
+                            receivedNumber = int.TryParse(strNumber, out int parsedNumber) ? parsedNumber : null;
+                        }
 
-                    if (receivedNumber is null)
-                    {
-                        Console.WriteLine("Number still null");
+                        if (receivedNumber is null)
+                        {
+                            //Console.WriteLine("Number still null");
+                            Console.WriteLine(message);
+                        }
                     }
                 }
             }
@@ -75,7 +80,8 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
         }
     }
     numbers.Add(receivedNumber.Value);
-    Console.WriteLine($"{Environment.CurrentManagedThreadId} found number: " + receivedNumber.ToString());
+    Console.Clear();
+    Console.WriteLine($"{Environment.CurrentManagedThreadId} found number {numbers.Count()}/2018: " + receivedNumber.ToString());
 });
 
 foreach (var number in numbers)
