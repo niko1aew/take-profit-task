@@ -11,16 +11,20 @@ namespace SocketApp
 {
     internal static class SocketHelper
     {
-        private static Regex rxLF = new Regex(@".*[\n]",
+        private static readonly Regex rxLF = new Regex(@".*[\n]",
           RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        private static Regex rxNumberTail = new Regex(@"\d[^\d]",
+        private static readonly Regex rxNumberTail = new Regex(@"\d[^\d]",
           RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         internal static Socket GetSocket()
         {
-            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            socket.ReceiveTimeout = 4000;
+            var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp)
+            {
+                ReceiveTimeout = 4000,
+                SendTimeout = 4000
+            };
+
             return socket;
         }
 

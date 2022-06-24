@@ -1,5 +1,6 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using SocketApp;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -7,8 +8,11 @@ using System.Text.RegularExpressions;
 
 Console.WriteLine("___Socket App___");
 
+ConcurrentBag<int> numbers = new();
+
 static int? GetNumber(int inputNumber)
 {
+    Console.WriteLine("Running in thread: " + Environment.CurrentManagedThreadId);
     var tcpEndpoint = SocketHelper.GetEndpoint();
     var tcpSocket = SocketHelper.GetSocket();
 
@@ -16,7 +20,9 @@ static int? GetNumber(int inputNumber)
     var data = Encoding.UTF8.GetBytes(message);
     var buffer = new byte[256];
     var answer = new StringBuilder();
-    
+
+    var availableIdleCycles = 30;
+
     string str;
 
     var isNumberReceived = false;
@@ -24,17 +30,28 @@ static int? GetNumber(int inputNumber)
     try
     {
         tcpSocket.Connect(tcpEndpoint);
-        tcpSocket.Send(data);
-
+        Console.WriteLine($"{Environment.CurrentManagedThreadId}: Socket {tcpSocket.Connected}");
+        Console.WriteLine($"{Environment.CurrentManagedThreadId}: Sending {message}");
+        var bytesSent = tcpSocket.Send(data);
+        Console.WriteLine($"{Environment.CurrentManagedThreadId}: sent {bytesSent} bytes");
         do
         {
+            if (tcpSocket.Available == 0)
+            {
+                availableIdleCycles--;
+                Thread.Sleep(100);
+            }
+
             var size = tcpSocket.Receive(buffer);
             str = Encoding.UTF8.GetString(buffer, 0, size);
-            Console.Write(str);
-
             answer.Append(str);
+            if (!string.IsNullOrWhiteSpace(str))
+            {
+                Console.WriteLine($"{Environment.CurrentManagedThreadId}: receive str \"{str}\"");
+            }
             if (SocketHelper.CheckReceiveTerminationRequired(str, answer.ToString())) isNumberReceived = true;
-        } while (!isNumberReceived && tcpSocket.Connected);
+            
+        } while (!isNumberReceived && tcpSocket.Connected && availableIdleCycles > 0);
     }
     catch (Exception e)
     {
@@ -45,30 +62,43 @@ static int? GetNumber(int inputNumber)
     {
         tcpSocket.Shutdown(SocketShutdown.Both);
         tcpSocket.Close();
-        Console.WriteLine("Socket closed");
+        Console.WriteLine($"{Environment.CurrentManagedThreadId}: Socket closed");
     }
 
     if (!isNumberReceived) return null;
 
     var strNumber = Regex.Replace(answer.ToString(), @"[^0-9]", "");
+    Console.WriteLine($"{Environment.CurrentManagedThreadId}: Find number {strNumber}");
     return Int32.TryParse(strNumber, out int resultNumber) ? resultNumber : null;
 }
 
-int? number = null;
+var inputNumberRange = Enumerable.Range(1, 100);
 
-while (number is null)
+Parallel.ForEach(inputNumberRange, inputNumber =>
 {
-    number = GetNumber(111);
-    if (number is null)
+    int? number = null;
+
+    while (number is null)
     {
-        // Restart socket
-        Console.WriteLine("Number is not received. Wait 5sec to retry...");
-        Thread.Sleep(5000);
+        number = GetNumber(inputNumber);
+        if (number is null)
+        {
+            // Restart socket
+            Console.WriteLine("Number is not received. Wait 5sec to retry...");
+            Thread.Sleep(5000);
+        }
+        else
+        {
+            //Console.WriteLine(number);
+            numbers.Add(number.Value);
+        }
     }
-    else
-    {
-        Console.WriteLine(number);
-    }
+});
+
+
+foreach(var number in numbers)
+{
+    Console.WriteLine(number);
 }
 
 Console.WriteLine("Press any key to quit");
