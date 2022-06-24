@@ -1,5 +1,6 @@
 ﻿using SocketApp;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -8,43 +9,66 @@ Console.WriteLine("___Socket App___");
 
 ConcurrentBag<int> numbers = new();
 
-
-
-//var test = "  fg  .. 854694596 ... ,,";
-
-//var strNumber = rxCropNumber.Replace(test, "");
-static long CalcMediana(int[] arr)
+/// <summary>
+/// Gets the median value from an array
+/// </summary>
+/// <typeparam name="T">The array type</typeparam>
+/// <param name="sourceArray">The source array</param>
+/// <param name="cloneArray">If it doesn't matter if the source array is sorted, you can pass false to improve performance</param>
+/// <returns></returns>
+static T GetMedian<T>(T[] sourceArray, bool cloneArray = true) where T : IComparable<T>
 {
-    //считаем общую сумму
-    var sum = arr.Sum();
-    //перебираем элементы, пока не достигнем 50% от суммы:
-    long accum = 0;
-    for (int i = 0; i < arr.Length; i++)
-    {
-        accum += arr[i];
-        if (accum >= sum / 2)
-            return i;
-    }
+    //Framework 2.0 version of this method. there is an easier way in F4        
+    if (sourceArray == null || sourceArray.Length == 0)
+        throw new ArgumentException("Median of empty array not defined.");
 
-    return arr.Length;
+    //make sure the list is sorted, but use a new array
+    T[] sortedArray = cloneArray ? (T[])sourceArray.Clone() : sourceArray;
+    Array.Sort(sortedArray);
+
+    //get the median
+    int size = sortedArray.Length;
+    int mid = size / 2;
+    if (size % 2 != 0)
+        return sortedArray[mid];
+
+    dynamic value1 = sortedArray[mid];
+    dynamic value2 = sortedArray[mid - 1];
+    return (sortedArray[mid] + value2) * 0.5;
+}
+
+if (true)
+{
+    var lines = File.ReadLines("numbers.txt");
+
+    var nums = lines.Select(x => double.Parse(x)).ToArray();
+    var median1 = GetMedian<double>(nums);
 }
 
 
 
+Console.WriteLine("Press any key to start...");
 Console.ReadLine();
 
 var inputNumberRange = Enumerable.Range(1, 2018);
-var options = new ParallelOptions { MaxDegreeOfParallelism = 100 };
+
+ThreadPool.GetMaxThreads(out int workerThreadsCount, out int completionPortThreadsCount);
+
+var options = new ParallelOptions { MaxDegreeOfParallelism = completionPortThreadsCount / 5 };
+
+Regex rxCropNumber = new(@"[^0-9]",
+      RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+Regex rxNumberTail = new(@"\d[^\d]",
+      RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+string ip = "88.212.241.115";
+int port = 2013;
+
 await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token) =>
 {
-    //Console.WriteLine($"Running in {Environment.CurrentManagedThreadId}");
 
-    Regex rxCropNumber = new(@"[^0-9]",
-          RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    Regex rxLF = new(@".*[\n]",
-          RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    int? receivedNumber = null;
+int? receivedNumber = null;
 
     while (receivedNumber is null)
     {
@@ -52,7 +76,7 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
         {
             try
             {
-                await client.ConnectAsync("88.212.241.115", 2013);
+                await client.ConnectAsync(ip, port);
 
                 if (client.Connected)
                 {
@@ -63,13 +87,7 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                     using (var reader = new StreamReader(tcpStream))
                     {
                         var message = await reader.ReadToEndAsync();
-                        //Console.WriteLine(message);
-                        //var isCompleteMessage = rxLF.Matches(message).Count > 0;
-                        var isCompleteMessage = true;
-                        if (!isCompleteMessage)
-                        {
-                            Console.WriteLine("MessageBroken");
-                        }
+                        var isCompleteMessage = rxNumberTail.Matches(message).Count > 0;
 
                         if (isCompleteMessage)
                         {
@@ -77,72 +95,27 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                             var strNumber = rxCropNumber.Replace(message, "");
                             receivedNumber = int.TryParse(strNumber, out int parsedNumber) ? parsedNumber : null;
                         }
-
-                        if (receivedNumber is null)
-                        {
-                            //Console.WriteLine("Number still null");
-                            //Console.WriteLine(message);
-                        }
                     }
                 }
             }
             catch (Exception e)
             {
-                //Console.WriteLine(e.Message);
+                Debug.Print(e.Message);
             }
-
         }
     }
     numbers.Add(receivedNumber.Value);
     Console.Clear();
-    Console.WriteLine($"{Environment.CurrentManagedThreadId} found number {numbers.Count()}/2018: " + receivedNumber.ToString());
+    Console.WriteLine($"Found number {numbers.Count()}/2018: " + receivedNumber.ToString());
 });
 
 File.WriteAllLines("numbers.txt", numbers.Select(x => x.ToString()));
 
-var median = CalcMediana(numbers.ToArray());
+var doubleNums = numbers.Select(x => (double)x).ToArray();
 
-Console.WriteLine("Медиана " + median);
-//foreach (var number in numbers)
-//{
-//    Console.WriteLine(number);
-//}
+var median = GetMedian(doubleNums);
+
+Console.WriteLine(median);
 
 Console.WriteLine("Press any key to quit");
 Console.ReadLine();
-
-
-
-
-
-
-
-//var inputNumberRange = Enumerable.Range(1, 100);
-
-//Parallel.ForEach(inputNumberRange, new ParallelOptions { MaxDegreeOfParallelism = 100 }, inputNumber =>
-//{
-//    Console.WriteLine("Running in thread: " + Environment.CurrentManagedThreadId);
-//    int? number = null;
-
-//    while (number is null)
-//    {
-//        number = SocketHelper.GetNumber(inputNumber);
-//        if (number is null)
-//        {
-//            Console.WriteLine($"{Environment.CurrentManagedThreadId}: Number is not received.Wait 5sec to retry...");
-//            Thread.Sleep(5000);
-//        }
-//        else
-//        {
-//            numbers.Add(number.Value);
-//        }
-//    }
-//});
-
-//foreach (var number in numbers)
-//{
-//    Console.WriteLine(number);
-//}
-
-//Console.WriteLine("Press any key to quit");
-//Console.ReadLine();
