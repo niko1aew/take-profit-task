@@ -13,17 +13,31 @@ ConcurrentBag<int> numbers = new();
 //var test = "  fg  .. 854694596 ... ,,";
 
 //var strNumber = rxCropNumber.Replace(test, "");
+static long CalcMediana(int[] arr)
+{
+    //считаем общую сумму
+    var sum = arr.Sum();
+    //перебираем элементы, пока не достигнем 50% от суммы:
+    long accum = 0;
+    for (int i = 0; i < arr.Length; i++)
+    {
+        accum += arr[i];
+        if (accum >= sum / 2)
+            return i;
+    }
 
+    return arr.Length;
+}
 
 
 
 Console.ReadLine();
 
-var inputNumberRange = Enumerable.Range(1, 100);
-var options = new ParallelOptions { MaxDegreeOfParallelism = inputNumberRange.Count() };
+var inputNumberRange = Enumerable.Range(1, 2018);
+var options = new ParallelOptions { MaxDegreeOfParallelism = 100 };
 await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token) =>
 {
-    Console.WriteLine($"Running in {Environment.CurrentManagedThreadId}");
+    //Console.WriteLine($"Running in {Environment.CurrentManagedThreadId}");
 
     Regex rxCropNumber = new(@"[^0-9]",
           RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -67,14 +81,14 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                         if (receivedNumber is null)
                         {
                             //Console.WriteLine("Number still null");
-                            Console.WriteLine(message);
+                            //Console.WriteLine(message);
                         }
                     }
                 }
             }
-            catch (SocketException e)
+            catch (Exception e)
             {
-                Console.WriteLine(e.Message);
+                //Console.WriteLine(e.Message);
             }
 
         }
@@ -84,10 +98,15 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
     Console.WriteLine($"{Environment.CurrentManagedThreadId} found number {numbers.Count()}/2018: " + receivedNumber.ToString());
 });
 
-foreach (var number in numbers)
-{
-    Console.WriteLine(number);
-}
+File.WriteAllLines("numbers.txt", numbers.Select(x => x.ToString()));
+
+var median = CalcMediana(numbers.ToArray());
+
+Console.WriteLine("Медиана " + median);
+//foreach (var number in numbers)
+//{
+//    Console.WriteLine(number);
+//}
 
 Console.WriteLine("Press any key to quit");
 Console.ReadLine();
