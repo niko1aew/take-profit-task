@@ -53,7 +53,7 @@ namespace SocketApp
             return rxNumberTail.Matches(source).Count > 0;
         }
 
-        internal static ReadOnlyMemory<byte> EncodeNumber(int source)
+        internal static ReadOnlyMemory<byte> EncodeString(string source)
         {
             return Encoding.UTF8.GetBytes($"{source}\n");
         }
