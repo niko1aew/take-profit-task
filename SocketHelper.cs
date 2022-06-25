@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SocketApp
 {
@@ -45,6 +46,16 @@ namespace SocketApp
                 result = int.TryParse(strNumber, out int parsedNumber) ? parsedNumber : null;
             }
             return result;
+        }
+
+        internal static bool CheckNumberIsReceived(string source)
+        {
+            return rxNumberTail.Matches(source).Count > 0;
+        }
+
+        internal static ReadOnlyMemory<byte> EncodeNumber(int source)
+        {
+            return Encoding.UTF8.GetBytes($"{source}\n");
         }
     }
 }

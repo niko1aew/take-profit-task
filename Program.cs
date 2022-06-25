@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
-using System.Text.RegularExpressions;
 
 Console.WriteLine("___Socket App___");
 
@@ -16,6 +15,7 @@ const int endNumber = 2018;
 const int maxDegreeOfParallelism = 200;
 const int connectionTimeout = 30000;
 const int errorCooldownTime = 5000;
+const int retryCooldownTime = 1000;
 const int readRetriesCount = 15;
 
 Console.WriteLine("Press any key to start...");
@@ -29,14 +29,7 @@ var inputNumberRange = Enumerable.Range(startNumber, endNumber);
 
 var options = new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism };
 
-Regex rxCropNumber = new(@"[^0-9]",
-      RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-Regex rxNumberTail = new(@"\d[^\d]",
-      RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
 var errorCount = 0;
-var cyclesCount = 0;
 var tasksDispatchedCount = 0;
 var reconnectRequestsCount = 0;
 var connectionTimeoutsCount = 0;
@@ -45,13 +38,11 @@ var startTime = DateTime.Now;
 
 await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token) =>
 {
-    tasksDispatchedCount++;
     int? receivedNumber = null;
-    ReadOnlyMemory<byte> sendBytes = Encoding.UTF8.GetBytes($"{inputNumber}\n");
+    var sendBytes = SocketHelper.EncodeNumber(inputNumber);
 
     while (receivedNumber is null)
     {
-        cyclesCount++;
         using var client = new TcpClient();
         try
         {
@@ -64,11 +55,14 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                 await tcpStream.WriteAsync(sendBytes, token);
 
                 using var reader = new StreamReader(tcpStream);
-                string? message = "";
+                string? message = string.Empty;
                 var isTimeout = false;
 
                 int retryReadCounter = readRetriesCount;
-                while (retryReadCounter > 0 && !isTimeout && (string.IsNullOrEmpty(message) || rxNumberTail.Matches(message).Count == 0))
+                while (retryReadCounter > 0 
+                    && !isTimeout
+                    && (string.IsNullOrEmpty(message)
+                        || !SocketHelper.CheckNumberIsReceived(message)))
                 {
                     retryReadCounter--;
                     var task = reader.ReadLineAsync();
@@ -82,18 +76,14 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                         isTimeout = true;
                         connectionTimeoutsCount++;
                     }
-                    if (string.IsNullOrEmpty(message) || rxNumberTail.Matches(message).Count == 0)
+                    if (string.IsNullOrEmpty(message) || !SocketHelper.CheckNumberIsReceived(message))
                     {
-                        await Task.Delay(1000, token);// Надо ли?
+                        await Task.Delay(retryCooldownTime, token);
                     }
                 }
 
                 receivedNumber = SocketHelper.ParseNumber(message);
-                //if (!string.IsNullOrEmpty(message) && rxNumberTail.Matches(message).Count > 0)
-                //{
-                //    var strNumber = rxCropNumber.Replace(message, "");
-                //    receivedNumber = int.TryParse(strNumber, out int parsedNumber) ? parsedNumber : null;
-                //}
+
                 if (receivedNumber is null)
                 {
                     if (!isTimeout)
