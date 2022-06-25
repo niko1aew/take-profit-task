@@ -57,5 +57,33 @@ namespace SocketApp
         {
             return Encoding.UTF8.GetBytes($"{source}\n");
         }
+
+        internal static bool GetBoolInputValue(string prompt)
+        {
+            bool value = false;
+            bool valid = false;
+            do
+            {
+                Console.WriteLine(prompt);
+                var inputString = Console.ReadLine();
+                if (string.IsNullOrEmpty(inputString))
+                {
+                    continue;
+                }
+                if (string.Equals(inputString, "yes"))
+                {
+                    value = true;
+                    valid = true;
+                }
+                else if (string.Equals(inputString, "no"))
+                {
+                    value = false;
+                    valid = true;
+                }
+
+            } while (!valid);
+
+            return value;
+        }
     }
 }

@@ -22,25 +22,26 @@ const int tokenRefreshInterval = 20000;
 
 Console.WriteLine("Press any key to start...");
 
-//KeyStore keyStore = new() { RefreshTimeout = tokenRefreshInterval };
-
-
-
-
-
 Console.ReadLine();
+
+bool useToken = SocketHelper.GetBoolInputValue("Use token? (yes|no): ");
 
 Console.Clear();
 
-Console.WriteLine("Receiving token...");
-//ThreadPool.QueueUserWorkItem(new WaitCallback(TaskCallback), keyStore);
-KeyStore.StartRefreshing(ip, port, tokenRefreshInterval);
-
-while (string.IsNullOrEmpty(KeyStore.TokenString))
+Console.WriteLine(useToken);
+Console.ReadLine();
+if (useToken)
 {
-    Console.Write(".");
-    await Task.Delay(1000);
+    Console.WriteLine("Receiving token...");
+    KeyStore.StartRefreshing(ip, port, tokenRefreshInterval);
+
+    while (string.IsNullOrEmpty(KeyStore.TokenString))
+    {
+        Console.Write(".");
+        await Task.Delay(1000);
+    }
 }
+
 
 Console.WriteLine("Wait...");
 
@@ -63,9 +64,9 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
 
     while (receivedNumber is null)
     {
-        var sendBytes = SocketHelper.EncodeString(string.IsNullOrEmpty(KeyStore.TokenString)
-            ? inputNumber.ToString()
-            : $"{KeyStore.TokenString}|{inputNumber}");
+        var sendBytes = SocketHelper.EncodeString(useToken
+            ? $"{KeyStore.TokenString}|{inputNumber}"
+            : inputNumber.ToString());
 
         using var client = new TcpClient();
         try
@@ -132,16 +133,19 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
         Console.Clear();
         var infoBuilder = new StringBuilder();
         infoBuilder.AppendLine($"Number {numbers.Count}/{endNumber}: {receivedNumber}");
-        infoBuilder.AppendLine($"Errors: {errorCount}");
+        //infoBuilder.AppendLine($"Errors: {errorCount}");
         infoBuilder.AppendLine($"Time: {timeDelta.ToString("c")}");
-        infoBuilder.AppendLine($"Tasks Dispatched: {tasksDispatchedCount}");
-        infoBuilder.AppendLine($"Reconnect requests: {reconnectRequestsCount}");
-        infoBuilder.AppendLine($"Connection timeouts: {connectionTimeoutsCount}");
+        //infoBuilder.AppendLine($"Tasks Dispatched: {tasksDispatchedCount}");
+        //infoBuilder.AppendLine($"Reconnect requests: {reconnectRequestsCount}");
+        //infoBuilder.AppendLine($"Connection timeouts: {connectionTimeoutsCount}");
         Console.WriteLine(infoBuilder);
     }
 });
 
-KeyStore.StopRefreshing();
+if (useToken)
+{
+    KeyStore.StopRefreshing();
+}
 
 var doubleNums = numbers.Select(x => (double)x).ToArray();
 
