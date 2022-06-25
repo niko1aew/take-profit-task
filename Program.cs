@@ -22,43 +22,9 @@ const int tokenRefreshInterval = 20000;
 
 Console.WriteLine("Press any key to start...");
 
-Key keyStore = new() { RefreshTimeout = tokenRefreshInterval };
+//KeyStore keyStore = new() { RefreshTimeout = tokenRefreshInterval };
 
-static async void TaskCallback(Object? obj)
-{
-    if (obj is not Key tokenObj) return;
 
-    while (tokenObj.refreshRequired)
-    {
-        try
-        {
-            // TODO: error handling | timeout handling
-            using var client = new TcpClient();
-
-            await client.ConnectAsync(ip, port);
-            var sendBytes = SocketHelper.EncodeString("Register");
-            var tcpStream = client.GetStream();
-
-            await tcpStream.WriteAsync(sendBytes);
-
-            using var reader = new StreamReader(tcpStream);
-            var receivedToken = await reader.ReadLineAsync();
-
-            if (!string.IsNullOrWhiteSpace(receivedToken))
-            {
-                tokenObj.TokenString = receivedToken;
-            }
-
-            Console.WriteLine("Received token: " + receivedToken);
-        } catch (Exception e)
-        {
-            Console.WriteLine("Token update error: " + e.Message);
-            await Task.Delay(10000);
-        }
-        
-        await Task.Delay(tokenObj.RefreshTimeout);
-    }
-}
 
 
 
@@ -67,9 +33,10 @@ Console.ReadLine();
 Console.Clear();
 
 Console.WriteLine("Receiving token...");
-ThreadPool.QueueUserWorkItem(new WaitCallback(TaskCallback), keyStore);
+//ThreadPool.QueueUserWorkItem(new WaitCallback(TaskCallback), keyStore);
+KeyStore.StartRefreshing(ip, port, tokenRefreshInterval);
 
-while (string.IsNullOrEmpty(keyStore.TokenString))
+while (string.IsNullOrEmpty(KeyStore.TokenString))
 {
     Console.Write(".");
     await Task.Delay(1000);
@@ -96,7 +63,10 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
 
     while (receivedNumber is null)
     {
-        var sendBytes = SocketHelper.EncodeString(string.IsNullOrEmpty(keyStore.TokenString) ? inputNumber.ToString() : $"{keyStore.TokenString}|{inputNumber}");
+        var sendBytes = SocketHelper.EncodeString(string.IsNullOrEmpty(KeyStore.TokenString)
+            ? inputNumber.ToString()
+            : $"{KeyStore.TokenString}|{inputNumber}");
+
         using var client = new TcpClient();
         try
         {
@@ -171,7 +141,7 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
     }
 });
 
-keyStore.refreshRequired = false;
+KeyStore.StopRefreshing();
 
 var doubleNums = numbers.Select(x => (double)x).ToArray();
 
