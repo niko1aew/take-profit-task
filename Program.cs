@@ -1,11 +1,6 @@
 ﻿using SocketApp;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Sockets;
-using System.Text;
-
-var consoleLock = new object();
-ConcurrentBag<int> numbers = new();
 
 const int startNumber = 1;
 const int endNumber = 2018;
@@ -24,8 +19,6 @@ Helper.ShowConfig(ip, port, useToken);
 Console.WriteLine("Press any key to start...");
 Console.ReadLine();
 
-var startTime = DateTime.Now;
-
 if (useToken)
 {
     Console.WriteLine("Receiving token...");
@@ -39,6 +32,8 @@ if (useToken)
 }
 
 Console.WriteLine("Wait...");
+
+var numberStore = new NumberStore(endNumber);
 
 var inputNumberRange = Enumerable.Range(startNumber, endNumber);
 
@@ -73,7 +68,8 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                 bool numberIsReceived = false;
                 while (remainingAttepts > 0
                     && !isReceiveTimeout
-                    && !numberIsReceived)
+                    && !numberIsReceived
+                    && client.Connected)
                 {
                     remainingAttepts--;
                     var readLineTask = reader.ReadLineAsync();
@@ -101,21 +97,11 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
         }
         catch (Exception e)
         {
-            Debug.Print(e.Message);
+            Debug.Print(e.Message);            
             await Task.Delay(errorCooldownTime, token);
         }
     }
-
-    numbers.Add(receivedNumber.Value);
-    var timeDelta = DateTime.Now - startTime;
-    if (numbers.Count % 10 == 0 || numbers.Count == endNumber)
-    {
-        Console.Clear();
-        var infoBuilder = new StringBuilder();
-        infoBuilder.AppendLine($"Number {numbers.Count}/{endNumber}: {receivedNumber}");
-        infoBuilder.AppendLine($"Time: {timeDelta.ToString("c")}");
-        Console.WriteLine(infoBuilder);
-    }
+    numberStore.AddNumber(receivedNumber.Value);
 });
 
 if (useToken)
@@ -123,9 +109,7 @@ if (useToken)
     KeyStore.StopRefreshing();
 }
 
-var median = Helper.GetMedian(numbers.ToArray());
-
-Console.WriteLine($"Median: {median}");
+Console.WriteLine($"Median: {numberStore.GetMedian()}");
 
 Console.WriteLine("Press any key to quit");
 Console.ReadLine();

@@ -20,26 +20,6 @@ namespace SocketApp
         static readonly Regex rxPort = new(@"^([1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$",
               RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        /// <summary>
-        /// Gets the median value from an array
-        /// </summary>
-        internal static double GetMedian(int[] sourceArray)
-        {
-            if (sourceArray == null || sourceArray.Length == 0)
-                throw new ArgumentException("Median of empty array not defined.");
-
-            // Make sure the list is sorted
-            Array.Sort(sourceArray);
-
-            // Get the median
-            int size = sourceArray.Length;
-            int mid = size / 2;
-            if (size % 2 != 0)
-                return sourceArray[mid];
-
-            dynamic value2 = sourceArray[mid - 1];
-            return (sourceArray[mid] + value2) * 0.5;
-        }
 
         /// <summary>
         /// Get result number from source string
@@ -156,6 +136,9 @@ namespace SocketApp
             } while (true);
         }
 
+        /// <summary>
+        /// Print formatted configuration to console
+        /// </summary>
         internal static void ShowConfig(string ip, int port, bool useToken)
         {
             Console.Clear();
