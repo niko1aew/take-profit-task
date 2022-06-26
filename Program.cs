@@ -16,24 +16,21 @@ const int maxDegreeOfParallelism = 200;
 const int connectionTimeout = 30000;
 const int errorCooldownTime = 5000;
 const int retryCooldownTime = 1000;
-const int readRetriesCount = 15;
-const int tokenRefreshInterval = 20000;
-
+const int retriesReadCount = 15;
 
 Console.WriteLine("Press any key to start...");
-
 Console.ReadLine();
 
-bool useToken = SocketHelper.GetBoolInputValue("Use token? (yes|no): ");
+var useToken = Helper.GetBoolInputValue("Use token? (yes|no): ");
 
 Console.Clear();
 
-Console.WriteLine(useToken);
-Console.ReadLine();
+var startTime = DateTime.Now;
+
 if (useToken)
 {
     Console.WriteLine("Receiving token...");
-    KeyStore.StartRefreshing(ip, port, tokenRefreshInterval);
+    KeyStore.StartRefreshing(ip, port);
 
     while (string.IsNullOrEmpty(KeyStore.TokenString))
     {
@@ -42,29 +39,19 @@ if (useToken)
     }
 }
 
-
 Console.WriteLine("Wait...");
 
 var inputNumberRange = Enumerable.Range(startNumber, endNumber);
 
 var options = new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism };
 
-var errorCount = 0;
-var tasksDispatchedCount = 0;
-var reconnectRequestsCount = 0;
-var connectionTimeoutsCount = 0;
-
-var startTime = DateTime.Now;
-
 await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token) =>
 {
-    tasksDispatchedCount++;
     int? receivedNumber = null;
-    
 
     while (receivedNumber is null)
     {
-        var sendBytes = SocketHelper.EncodeString(useToken
+        var sendBytes = Helper.EncodeString(useToken
             ? $"{KeyStore.TokenString}|{inputNumber}"
             : inputNumber.ToString());
 
@@ -81,50 +68,45 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
 
                 using var reader = new StreamReader(tcpStream);
                 string? message = string.Empty;
-                var isTimeout = false;
+                var isReceiveTimeout = false;
 
-                int retryReadCounter = readRetriesCount;
-                while (retryReadCounter > 0
-                    && !isTimeout
-                    && (string.IsNullOrEmpty(message)
-                        || !SocketHelper.CheckNumberIsReceived(message)))
+                int remainingAttepts = retriesReadCount;
+                bool numberIsReceived = false;
+                while (remainingAttepts > 0
+                    && !isReceiveTimeout
+                    && !numberIsReceived)
                 {
-                    retryReadCounter--;
-                    var task = reader.ReadLineAsync();
+                    remainingAttepts--;
+                    var readLineTask = reader.ReadLineAsync();
 
-                    if (await Task.WhenAny(task, Task.Delay(connectionTimeout, token)) == task)
+                    // Performing read operation with timeout
+                    if (await Task.WhenAny(readLineTask, Task.Delay(connectionTimeout, token))
+                        == readLineTask)
                     {
-                        message = await task;
+                        message = await readLineTask;
                     }
                     else
                     {
-                        isTimeout = true;
-                        connectionTimeoutsCount++;
+                        isReceiveTimeout = true;
                     }
-                    if (string.IsNullOrEmpty(message) || !SocketHelper.CheckNumberIsReceived(message))
+
+                    numberIsReceived = Helper.CheckNumberIsReceived(message);
+                    if (!numberIsReceived)
                     {
                         await Task.Delay(retryCooldownTime, token);
                     }
                 }
 
-                receivedNumber = SocketHelper.ParseNumber(message);
-
-                if (receivedNumber is null)
-                {
-                    if (!isTimeout)
-                    {
-                        reconnectRequestsCount++;
-                    }
-                }
+                receivedNumber = Helper.ParseNumber(message);
             }
         }
         catch (Exception e)
         {
-            errorCount++;
             Debug.Print(e.Message);
             await Task.Delay(errorCooldownTime, token);
         }
     }
+
     numbers.Add(receivedNumber.Value);
 
     var timeDelta = DateTime.Now - startTime;
@@ -133,11 +115,7 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
         Console.Clear();
         var infoBuilder = new StringBuilder();
         infoBuilder.AppendLine($"Number {numbers.Count}/{endNumber}: {receivedNumber}");
-        //infoBuilder.AppendLine($"Errors: {errorCount}");
         infoBuilder.AppendLine($"Time: {timeDelta.ToString("c")}");
-        //infoBuilder.AppendLine($"Tasks Dispatched: {tasksDispatchedCount}");
-        //infoBuilder.AppendLine($"Reconnect requests: {reconnectRequestsCount}");
-        //infoBuilder.AppendLine($"Connection timeouts: {connectionTimeoutsCount}");
         Console.WriteLine(infoBuilder);
     }
 });
@@ -147,9 +125,7 @@ if (useToken)
     KeyStore.StopRefreshing();
 }
 
-var doubleNums = numbers.Select(x => (double)x).ToArray();
-
-var median = SocketHelper.GetMedian(doubleNums);
+var median = Helper.GetMedian(numbers.ToArray());
 
 Console.WriteLine($"Median: {median}");
 

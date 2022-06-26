@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace SocketApp
 {
+    /// <summary>
+    /// Abstraction for manipulating server key
+    /// </summary>
     internal static class KeyStore
     {
         private static string _ip = string.Empty;
@@ -15,24 +18,31 @@ namespace SocketApp
         private static int _refreshTimeout = 20000;
         private static bool _refreshRequired = false;
 
+        /// <summary>
+        /// Server key
+        /// </summary>
         public static string TokenString { get; set; } = string.Empty;
 
-        
-        public static void StartRefreshing(string ip, int port, int timeout)
+        /// <summary>
+        /// Start polling key from server every <paramref name="timeout"/> ms
+        /// </summary>
+        public static void StartRefreshing(string ip, int port)
         {
             _ip = ip;
             _port = port;
-            _refreshTimeout = timeout;
             _refreshRequired = true;
-            ThreadPool.QueueUserWorkItem(new WaitCallback(TaskCallback), new Object());
+            ThreadPool.QueueUserWorkItem(new WaitCallback(KeyRequestTaskCallback));
         }
 
+        /// <summary>
+        /// Stop key polling
+        /// </summary>
         public static void StopRefreshing()
         {
             _refreshRequired = false;
         }
 
-        async static void TaskCallback(Object? state)
+        async static void KeyRequestTaskCallback(object? state)
         {
             while (_refreshRequired)
             {
@@ -41,12 +51,12 @@ namespace SocketApp
                     using var client = new TcpClient();
 
                     await client.ConnectAsync(_ip, _port);
-                    var sendBytes = SocketHelper.EncodeString("Register");
+                    var sendBytes = Helper.EncodeString("Register");
                     var tcpStream = client.GetStream();
-
                     await tcpStream.WriteAsync(sendBytes);
 
                     using var reader = new StreamReader(tcpStream);
+
                     var receivedToken = await reader.ReadLineAsync();
 
                     if (!string.IsNullOrWhiteSpace(receivedToken))
@@ -66,5 +76,4 @@ namespace SocketApp
             }
         }
     }
-
 }
