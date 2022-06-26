@@ -4,12 +4,9 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 
-Console.WriteLine("___Socket App___");
-
+var consoleLock = new object();
 ConcurrentBag<int> numbers = new();
 
-const string ip = "88.212.241.115";
-const int port = 2013;
 const int startNumber = 1;
 const int endNumber = 2018;
 const int maxDegreeOfParallelism = 200;
@@ -18,12 +15,14 @@ const int errorCooldownTime = 5000;
 const int retryCooldownTime = 1000;
 const int retriesReadCount = 15;
 
+var useToken = Helper.GetBoolInputValue("Use token? yes|no (default - no): ");
+var ip = Helper.GetIpInputValue();
+var port = Helper.GetPortInputValue();
+
+Helper.ShowConfig(ip, port, useToken);
+
 Console.WriteLine("Press any key to start...");
 Console.ReadLine();
-
-var useToken = Helper.GetBoolInputValue("Use token? (yes|no): ");
-
-Console.Clear();
 
 var startTime = DateTime.Now;
 
@@ -108,7 +107,6 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
     }
 
     numbers.Add(receivedNumber.Value);
-
     var timeDelta = DateTime.Now - startTime;
     if (numbers.Count % 10 == 0 || numbers.Count == endNumber)
     {
