@@ -4,13 +4,12 @@ using System.Net.Sockets;
 
 const int startNumber = 1;
 const int endNumber = 2018;
-const int maxDegreeOfParallelism = 200;
 const int connectionTimeout = 30000;
 const int errorCooldownTime = 5000;
 const int retryCooldownTime = 1000;
 const int retriesReadCount = 15;
 
-var useToken = Helper.GetBoolInputValue("Use token? yes|no (default - no): ");
+var useToken = Helper.GetBoolInputValue("Use token? yes|no (default - yes): ");
 var ip = Helper.GetIpInputValue();
 var port = Helper.GetPortInputValue();
 
@@ -30,14 +29,16 @@ if (useToken)
         await Task.Delay(1000);
     }
 }
-
+Console.Clear();
 Console.WriteLine("Wait...");
 
 var numberStore = new NumberStore(endNumber);
 
 var inputNumberRange = Enumerable.Range(startNumber, endNumber);
 
-var options = new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism };
+ThreadPool.GetMaxThreads(out int maxWorkerThreads, out int maxIoThreads);
+
+var options = new ParallelOptions { MaxDegreeOfParallelism = maxIoThreads / 3 };
 
 await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token) =>
 {
@@ -108,6 +109,8 @@ if (useToken)
 {
     KeyStore.StopRefreshing();
 }
+
+Console.SetCursorPosition(0, 3);
 
 Console.WriteLine($"Median: {numberStore.GetMedian()}");
 

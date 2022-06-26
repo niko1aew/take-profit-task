@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Diagnostics;
 using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SocketApp
 {
@@ -15,7 +11,7 @@ namespace SocketApp
         private static string _ip = string.Empty;
         private static int _port;
         private static readonly int _errorCooldownTime = 10000;
-        private static int _refreshTimeout = 20000;
+        private static readonly int _refreshTimeout = 20000;
         private static bool _refreshRequired = false;
 
         /// <summary>
@@ -63,12 +59,10 @@ namespace SocketApp
                     {
                         TokenString = receivedToken;
                     }
-
-                    Console.WriteLine("Received token: " + receivedToken);
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Token update error: " + e.Message);
+                    Debug.Print("Token update error: " + e.Message);
                     await Task.Delay(_errorCooldownTime);
                 }
 

@@ -64,7 +64,7 @@ namespace SocketApp
                 var inputString = Console.ReadLine();
                 if (inputString == String.Empty)
                 {
-                    return false;
+                    return true;
                 }
                 else if (string.IsNullOrEmpty(inputString))
                 {

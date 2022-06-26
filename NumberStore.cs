@@ -12,6 +12,7 @@ namespace SocketApp
         private ConcurrentBag<int> numbers = new();
         private int _numbersCount;
         private DateTime _createTime;
+        private static Object lockObj = new();
 
         public NumberStore(int numbersCount)
         {
@@ -24,13 +25,17 @@ namespace SocketApp
         /// </summary>
         internal void AddNumber(int number)
         {
-            var timeDelta = DateTime.Now - _createTime;
             numbers.Add(number);
-            Console.Clear();
-            var infoBuilder = new StringBuilder();
-            infoBuilder.AppendLine($"Number {numbers.Count}/{_numbersCount}: {number}");
-            infoBuilder.AppendLine($"Time: {timeDelta.ToString("c")}");
-            Console.WriteLine(infoBuilder);
+            lock(lockObj)
+            {
+                var timeDelta = DateTime.Now - _createTime;
+
+                Console.SetCursorPosition(0, 0);
+                var infoBuilder = new StringBuilder();
+                infoBuilder.AppendLine($"Number {numbers.Count}/{_numbersCount}: {number}");
+                infoBuilder.AppendLine($"Time: {timeDelta.ToString("c")}");
+                Console.WriteLine(infoBuilder);
+            }
         }
 
         /// <summary>
