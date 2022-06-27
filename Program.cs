@@ -65,8 +65,11 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                 string? message = string.Empty;
                 var isReceiveTimeout = false;
 
-                int remainingAttepts = retriesReadCount;
-                bool numberIsReceived = false;
+                var remainingAttepts = retriesReadCount;
+                var numberIsReceived = false;
+                var numberIsInValidRange = false;
+                int? parsedNumber = null;
+
                 while (remainingAttepts > 0
                     && !isReceiveTimeout
                     && !numberIsReceived
@@ -87,13 +90,19 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                     }
 
                     numberIsReceived = Helper.CheckNumberIsReceived(message);
-                    if (!numberIsReceived)
+                    if (numberIsReceived)
+                    {
+                        parsedNumber = Helper.ParseNumber(message);
+                        numberIsInValidRange = parsedNumber.HasValue
+                            && NumberStore.CheckNumberIsInValidRange(parsedNumber.Value);
+                    }
+                    if (!numberIsReceived || !numberIsInValidRange)
                     {
                         await Task.Delay(retryCooldownTime, token);
                     }
                 }
 
-                receivedNumber = Helper.ParseNumber(message);
+                receivedNumber = parsedNumber;
             }
         }
         catch (Exception e)

@@ -1,18 +1,14 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Concurrent;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace SocketApp
 {
     internal class NumberStore
     {
-        private ConcurrentBag<int> numbers = new();
-        private int _numbersCount;
-        private DateTime _createTime;
-        private static Object lockObj = new();
+        private readonly ConcurrentBag<int> numbers = new();
+        private readonly int _numbersCount;
+        private readonly DateTime _createTime;
+        private static readonly Object lockObj = new();
 
         public NumberStore(int numbersCount)
         {
@@ -36,6 +32,14 @@ namespace SocketApp
                 infoBuilder.AppendLine($"Time: {timeDelta.ToString("c")}");
                 Console.WriteLine(infoBuilder);
             }
+        }
+
+        /// <summary>
+        /// Check number is in (0 <= x< 1e7) range
+        /// </summary>
+        internal static bool CheckNumberIsInValidRange(int number)
+        {
+            return number >= 0 && number < 10000000;
         }
 
         /// <summary>
