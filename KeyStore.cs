@@ -12,11 +12,10 @@ namespace SocketApp
         private static int _port;
         private static readonly int _errorCooldownTime = 10000;
         private static readonly int _refreshTimeout = 20000;
-        private static bool _refreshRequired = false;
         private static Object _lockObj = new object();
         private static bool _isRefreshing = false;
-        //private static readonly SemaphoreLocker _locker = new SemaphoreLocker();
         private static SemaphoreSlim semaphore = new(1);
+
         /// <summary>
         /// Server key
         /// </summary>
@@ -30,29 +29,13 @@ namespace SocketApp
 
 
         /// <summary>
-        /// Start polling key from server every <paramref name="timeout"/> ms
+        /// Init
         /// </summary>
-        public static void StartRefreshing(string ip, int port)
+        public static void Init(string ip, int port)
         {
             _ip = ip;
             _port = port;
-            _refreshRequired = true;
-            //ThreadPool.QueueUserWorkItem(new WaitCallback(KeyRequestTaskCallback));
         }
-
-        /// <summary>
-        /// Stop key polling
-        /// </summary>
-        public static void StopRefreshing()
-        {
-            _refreshRequired = false;
-        }
-
-        //public static void SetKeyExpired()
-        //{
-        //    IsKeyExpired = true;
-        //    RefreshKey();
-        //}
 
         public static async void RefreshKey(string key)
         {
@@ -90,8 +73,12 @@ namespace SocketApp
 
                         receivedToken = await reader.ReadLineAsync();
 
-                        Console.WriteLine($"Token: {receivedToken}");
+                        Console.WriteLine($"{DateTime.Now.ToLongTimeString()} Token: {receivedToken}");
 
+                        if (receivedToken == "Rate limit. Please wait some time then repeat.")
+                        {
+                            Console.WriteLine("Rate limit");
+                        }
                         if (!string.IsNullOrWhiteSpace(receivedToken)
                             && receivedToken != "Rate limit. Please wait some time then repeat.")
                         {
@@ -116,87 +103,5 @@ namespace SocketApp
                 //Thread.Sleep(_errorCooldownTime);
             }
         }
-
-
-
-        //Console.WriteLine($"<{Thread.CurrentThread.ManagedThreadId}> enter refresh");
-        //await _locker.LockAsync(async () =>
-        //{
-        //    if (true)
-        //    {
-        //        Console.WriteLine($"<{Thread.CurrentThread.ManagedThreadId}> refreshing");
-        //        IsRefreshInProgress = true;
-        //        string? receivedToken = null;
-        //        RefreshCount++;
-        //        Console.SetCursorPosition(0, 3);
-        //        Console.WriteLine("Refresh count" + RefreshCount.ToString());
-        //        while (string.IsNullOrEmpty(receivedToken))
-        //        {
-        //            try
-        //            {
-        //                using var client = new TcpClient();
-
-        //                await client.ConnectAsync(_ip, _port);
-        //                var sendBytes = Helper.EncodeString("Register");
-        //                var tcpStream = client.GetStream();
-        //                await tcpStream.WriteAsync(sendBytes);
-
-        //                using var reader = new StreamReader(tcpStream);
-
-        //                receivedToken = await reader.ReadLineAsync();
-
-        //                if (!string.IsNullOrWhiteSpace(receivedToken)
-        //                    && receivedToken != "Rate limit. Please wait some time then repeat.")
-        //                {
-        //                    TokenString = receivedToken;
-        //                    IsKeyExpired = false;
-        //                    IsRefreshInProgress = false;
-        //                }
-        //            }
-        //            catch (Exception e)
-        //            {
-        //                Debug.Print("Token update error: " + e.Message);
-        //                await Task.Delay(_errorCooldownTime);
-        //            }
-        //        }
-        //    }
-
-
-        //});
-        //IsKeyExpired = false;
-        //return true;
-    
-
-    async static void KeyRequestTaskCallback(object? state)
-    {
-        while (_refreshRequired)
-        {
-            try
-            {
-                using var client = new TcpClient();
-
-                await client.ConnectAsync(_ip, _port);
-                var sendBytes = Helper.EncodeString("Register");
-                var tcpStream = client.GetStream();
-                await tcpStream.WriteAsync(sendBytes);
-
-                using var reader = new StreamReader(tcpStream);
-
-                var receivedToken = await reader.ReadLineAsync();
-
-                if (!string.IsNullOrWhiteSpace(receivedToken))
-                {
-                    TokenString = receivedToken;
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.Print("Token update error: " + e.Message);
-                await Task.Delay(_errorCooldownTime);
-            }
-
-            await Task.Delay(_refreshTimeout);
-        }
     }
-}
 }

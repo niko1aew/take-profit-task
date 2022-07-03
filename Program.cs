@@ -28,7 +28,7 @@ Console.ReadLine();
 if (useToken)
 {
     Console.WriteLine("Receiving token...");
-    KeyStore.StartRefreshing(ip, port);
+    KeyStore.Init(ip, port);
     KeyStore.RefreshKey("");
     while (KeyStore.IsKeyExpired)
     {
@@ -63,14 +63,11 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
 
     while (receivedNumber is null)
     {
+        while (useToken && KeyStore.IsKeyExpired)
+        {
+            await Task.Delay(100);
+        }
 
-        //while (KeyStore.IsKeyExpired)
-        //{
-        //    //Console.WriteLine("In while loop");
-        //    await Task.Delay(200);
-        //}
-
-        //}
         var tokenString = KeyStore.TokenString;
         var sendString = useToken
             ? $"{tokenString}|{inputNumber}"
@@ -103,14 +100,15 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                     == readLineTask)
                 {
                     message = await readLineTask;
-                    Console.WriteLine($"{guid}: {message}");
+                    //Console.WriteLine($"{guid}: {message}");
                     if (useToken && message == "Key has expired")
                     {
+                        //Console.WriteLine($"{guid}: {message} {tokenString}");
                         await Task.Delay(1000);
                         //Console.WriteLine($"<{Thread.CurrentThread.ManagedThreadId}> Key expired");
 
                         KeyStore.RefreshKey(tokenString);
-
+                        continue;
 
                         //continue;
                         //Console.WriteLine($"{message} <{Thread.CurrentThread.ManagedThreadId}>");
@@ -145,11 +143,6 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
     }
     numberStore.AddNumber(receivedNumber.Value);
 });
-
-if (useToken)
-{
-    KeyStore.StopRefreshing();
-}
 
 Console.SetCursorPosition(0, 3);
 
