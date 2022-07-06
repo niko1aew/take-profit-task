@@ -21,15 +21,14 @@ namespace SocketApp
         /// </summary>
         public static string TokenString { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Show if actual key is expired
+        /// </summary>
         public static bool IsKeyExpired { get; set; } = false;
-
-        //public static bool IsRefreshInProgress { get; set; }
-
-        public static int RefreshCount { get; set; } = 0;
 
 
         /// <summary>
-        /// Init
+        /// Initialize
         /// </summary>
         public static void Init(string ip, int port)
         {
@@ -37,71 +36,57 @@ namespace SocketApp
             _port = port;
         }
 
-        public static async void RefreshKey(string key)
+        public static async void RefreshKey(string expiredKey)
         {
-            try
-            {
-                await semaphore.WaitAsync();
 
-                if (key != TokenString)
+            await semaphore.WaitAsync();
+
+            if (expiredKey != TokenString)
+            {
+                semaphore.Release();
+                return;
+            }
+
+            IsKeyExpired = true;
+
+            string? receivedToken = null;
+
+            while (string.IsNullOrEmpty(receivedToken))
+            {
+                try
                 {
-                    semaphore.Release();
-                    return;
-                }
-                if (!_isRefreshing)
-                {
-                    _isRefreshing = true;
-                    IsKeyExpired = true;
-                    //Console.SetCursorPosition(0, 20);
-                    Console.WriteLine($"<{Thread.CurrentThread.ManagedThreadId}> refreshing");
-                    //IsRefreshInProgress = true;
-                    string? receivedToken = null;
-                    RefreshCount++;
-                    //Console.SetCursorPosition(0, 15);
-                    Console.WriteLine("Refresh count" + RefreshCount.ToString());
-                    while (string.IsNullOrEmpty(receivedToken))
+                    using var client = new TcpClient();
+
+                    client.Connect(_ip, _port);
+
+                    var sendBytes = Helper.EncodeString("Register");
+                    var tcpStream = client.GetStream();
+                    await tcpStream.WriteAsync(sendBytes);
+
+                    using var reader = new StreamReader(tcpStream);
+
+                    receivedToken = await reader.ReadLineAsync();
+
+                    if (receivedToken == "Rate limit. Please wait some time then repeat.")
                     {
-
-                        using var client = new TcpClient();
-
-                        client.Connect(_ip, _port);
-                        var sendBytes = Helper.EncodeString("Register");
-                        var tcpStream = client.GetStream();
-                        await tcpStream.WriteAsync(sendBytes);
-
-                        using var reader = new StreamReader(tcpStream);
-
-                        receivedToken = await reader.ReadLineAsync();
-
-                        Console.WriteLine($"{DateTime.Now.ToLongTimeString()} Token: {receivedToken}");
-
-                        if (receivedToken == "Rate limit. Please wait some time then repeat.")
-                        {
-                            Console.WriteLine("Rate limit");
-                        }
-                        if (!string.IsNullOrWhiteSpace(receivedToken)
-                            && receivedToken != "Rate limit. Please wait some time then repeat.")
-                        {
-                            TokenString = receivedToken;
-                            IsKeyExpired = false;
-
-                            //IsRefreshInProgress = false;
-                        }
-
-                    };
-                    _isRefreshing = false;
-                    semaphore.Release();
+                        throw new Exception("Rate limit exceeded");
+                    }
+                    if (!string.IsNullOrWhiteSpace(receivedToken))
+                    {
+                        TokenString = receivedToken;
+                        IsKeyExpired = false;
+                    }
                 }
-                semaphore.Release();
+
+                catch (Exception e)
+                {
+                    _isRefreshing = false;
+                    Debug.Print("Token update error: " + e.Message);
+                    await Task.Delay(_errorCooldownTime);
+                }
             }
-            catch (Exception e)
-            {
-                _isRefreshing = false;
-                semaphore.Release();
-                Debug.Print("Token update error: " + e.Message);
-                //await Task.Delay(_errorCooldownTime);
-                //Thread.Sleep(_errorCooldownTime);
-            }
+
+            semaphore.Release();
         }
     }
 }

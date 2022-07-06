@@ -26,11 +26,11 @@ namespace SocketApp
             {
                 var timeDelta = DateTime.Now - _createTime;
 
-                //Console.SetCursorPosition(0, 0);
+                Console.SetCursorPosition(0, 0);
                 var infoBuilder = new StringBuilder();
                 infoBuilder.AppendLine($"Number {numbers.Count}/{_numbersCount}: {number}");
                 infoBuilder.AppendLine($"Time: {timeDelta.ToString("c")}");
-                //Console.WriteLine(infoBuilder);
+                Console.WriteLine(infoBuilder);
             }
         }
 
