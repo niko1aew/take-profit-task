@@ -1,27 +1,22 @@
 ﻿using SocketApp;
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.Text;
+using System.Text.RegularExpressions;
 
 const int startNumber = 1;
 const int endNumber = 2018;
 const int connectionTimeout = 30000;
 const int errorCooldownTime = 5000;
-const int retryCooldownTime = 1000;
+const int keyExpiredCooldownTime = 100;
+const int waitDelay = 1000;
 
-//var useToken = Helper.GetBoolInputValue("Use token? yes|no (default - yes): ");
-//var ip = Helper.GetIpInputValue();
-//var port = Helper.GetPortInputValue();
-
-var useToken = true;
-//var ip = "127.0.0.1";
-var ip = "88.212.241.115";
-//var port = 8888;
-var port = 2013;
+var useToken = Helper.GetBoolInputValue("Use token? yes|no (default - yes): ");
+var ip = Helper.GetIpInputValue();
+var port = Helper.GetPortInputValue();
 
 Helper.ShowConfig(ip, port, useToken);
 
-ThreadPool.GetMaxThreads(out int w, out int e);
-Console.WriteLine(e);
 Console.WriteLine("Press any key to start...");
 Console.ReadLine();
 
@@ -34,15 +29,12 @@ if (useToken)
     while (string.IsNullOrEmpty(KeyStore.TokenString))
     {
         Console.Write(".");
-        await Task.Delay(1000);
+        await Task.Delay(waitDelay);
     }
 
     Console.WriteLine($"Received token: {KeyStore.TokenString}." +
         $" Will start at 1 second...");
-    await Task.Delay(1000);
-    //Console.ReadLine();
-
-    
+    await Task.Delay(waitDelay);
 }
 Console.Clear();
 Console.WriteLine("Wait...");
@@ -63,7 +55,7 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
     {
         if (useToken && KeyStore.IsKeyExpired)
         {
-            await Task.Delay(100);
+            await Task.Delay(keyExpiredCooldownTime);
             continue;
         }
 
@@ -93,42 +85,56 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
                 var numberIsInValidRange = false;
                 int? parsedNumber = null;
 
+                var messageBuilder = new StringBuilder();
+                var messagePart = string.Empty;
+                Memory<char> buffer = new char[1];
 
-                var readLineTask = reader.ReadLineAsync();
-
-                // Performing read operation with timeout
-                if (await Task.WhenAny(readLineTask, Task.Delay(connectionTimeout, token))
-                    == readLineTask)
+                var readCharsCount = 0;
+                do
                 {
-                    message = await readLineTask;
+                    var result = reader.ReadAsync(buffer);
 
-                    if (useToken && message == "Key has expired")
+                    await Task.WhenAny(result.AsTask(), Task.Delay(connectionTimeout));
+
+                    if (!result.IsCompleted)
                     {
-                        //await Task.Delay(1000);
-
-                        KeyStore.RefreshKey(tokenString);
-                        continue;
+                        throw new Exception("Read timeout");
                     }
-
-                    if (!KeyStore.IsKeyExpired)
+                    else
                     {
-                        numberIsReceived = Helper.CheckNumberIsReceived(message);
-                        if (numberIsReceived)
+                        readCharsCount = await result;
+                        if (readCharsCount > 0)
                         {
-                            parsedNumber = Helper.ParseNumber(message);
-                            numberIsInValidRange = parsedNumber.HasValue
-                                && NumberStore.CheckNumberIsInValidRange(parsedNumber.Value);
-                        }
-                        if (!numberIsReceived || !numberIsInValidRange)
-                        {
-                            await Task.Delay(retryCooldownTime, token);
-                        }
+                            messagePart = buffer.ToString();
 
+                            if (!string.IsNullOrEmpty(messagePart))
+                            {
+                                messageBuilder.Append(messagePart);
+                            }
+                            message = messageBuilder.ToString();
 
-                        receivedNumber = parsedNumber;
+                            if (useToken && message == "Key has expired")
+                            {
+                                KeyStore.RefreshKey(tokenString);
+                                break;
+                            }
+
+                            numberIsReceived = Helper.CheckNumberIsReceived(message);
+
+                            if (numberIsReceived)
+                            {
+                                parsedNumber = Helper.ParseNumber(message);
+                                numberIsInValidRange = parsedNumber.HasValue
+                                    && NumberStore.CheckNumberIsInValidRange(parsedNumber.Value);
+                            }
+
+                            if (numberIsReceived && numberIsInValidRange)
+                            {
+                                receivedNumber = parsedNumber;
+                            }
+                        }
                     }
-
-                }
+                } while (readCharsCount > 0 && receivedNumber is null);
             }
         }
         catch (Exception e)
@@ -140,7 +146,7 @@ await Parallel.ForEachAsync(inputNumberRange, options, async (inputNumber, token
     numberStore.AddNumber(receivedNumber.Value);
 });
 
-//Console.SetCursorPosition(0, 3);
+Console.SetCursorPosition(0, 3);
 
 Console.WriteLine($"Median: {numberStore.GetMedian()}");
 

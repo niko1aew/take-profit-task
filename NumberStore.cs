@@ -15,7 +15,7 @@ namespace SocketApp
             _numbersCount = numbersCount;
             _createTime = DateTime.Now;
         }
-
+        
         /// <summary>
         /// Add number to collection
         /// </summary>
