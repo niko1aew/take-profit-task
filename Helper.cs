@@ -5,8 +5,8 @@ namespace SocketApp
 {
     internal static class Helper
     {
-        const string defaultIp = "88.212.241.115";
-        const string defaultPort = "2013";
+        const string defaultIp = "127.0.0.1";
+        const string defaultPort = "8888";
         
         static readonly Regex rxFindNumber = new(@"[^0-9]",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);

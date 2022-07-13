@@ -11,10 +11,7 @@ namespace SocketApp
         private static string _ip = string.Empty;
         private static int _port;
         private static readonly int _errorCooldownTime = 10000;
-        private static readonly int _refreshTimeout = 20000;
-        private static Object _lockObj = new object();
-        private static bool _isRefreshing = false;
-        private static SemaphoreSlim semaphore = new(1);
+        private static readonly SemaphoreSlim semaphore = new(1);
 
         /// <summary>
         /// Server key
@@ -80,7 +77,6 @@ namespace SocketApp
 
                 catch (Exception e)
                 {
-                    _isRefreshing = false;
                     Debug.Print("Token update error: " + e.Message);
                     await Task.Delay(_errorCooldownTime);
                 }
